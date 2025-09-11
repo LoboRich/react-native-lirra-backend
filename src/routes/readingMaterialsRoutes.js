@@ -9,7 +9,7 @@ router.post('/', protectRoute, async(req, res) => {
     try {
         const {title, type, caption, author, image} = req.body;
 
-        if(!title || !type || !caption || !author || !image) {
+        if(!title || !caption || !image) {
             return res.status(400).json({message: 'Please provide all required fields'});
         }
         // upload image to cloudinary
