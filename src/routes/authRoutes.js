@@ -13,7 +13,7 @@ const generateToken = (userId) => {
 
 router.post('/register', async(req, res) => {
    try {
-        const { username, email, password } = req.body;
+        const { username, firstname, lastname, postnomials, college, email, password } = req.body;
 
         if(!username || !email || !password) {
             return res.status(400).json({ message: 'All fields are required' });
@@ -44,7 +44,11 @@ router.post('/register', async(req, res) => {
             username,
             email,
             password,
-            profileImage
+            profileImage,
+            firstName: firstname,
+            lastName: lastname,
+            postnomials,
+            college
         });
 
         await user.save();
@@ -58,6 +62,10 @@ router.post('/register', async(req, res) => {
                 username: user.username,
                 email: user.email,
                 profileImage: user.profileImage,
+                firstName: user.firstName,
+                lastName: user.lastName,
+                postnomials: user.postnomials,
+                college: user.college
             },
         });
         
@@ -96,6 +104,10 @@ router.post('/login', async(req, res) => {
                 username: user.username,
                 email: user.email,
                 profileImage: user.profileImage,
+                firstName: user.firstName,
+                lastName: user.lastName,
+                postnomials: user.postnomials,
+                college: user.college
             },
         });
         
