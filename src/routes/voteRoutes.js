@@ -15,18 +15,29 @@ router.post("/:materialId", protectRoute, async (req, res) => {
     if (existingVote) {
       // remove vote (toggle off)
       await Vote.deleteOne({ _id: existingVote._id });
-      return res.json({ message: "Vote removed", voted: false });
+      const votesCount = await Vote.countDocuments({ material: materialId });
+
+      return res.json({
+        message: "Vote removed",
+        voted: false,
+        votesCount,
+      });
     } else {
       // add new vote (toggle on)
       await Vote.create({ user: userId, material: materialId });
-      return res.json({ message: "Vote added", voted: true });
+      const votesCount = await Vote.countDocuments({ material: materialId });
+
+      return res.json({
+        message: "Vote added",
+        voted: true,
+        votesCount,
+      });
     }
   } catch (err) {
     console.error("Vote error:", err);
     res.status(500).json({ message: "Failed to record vote" });
   }
 });
-
 
 router.delete("/:materialId", protectRoute, async (req, res) => {
   try {
