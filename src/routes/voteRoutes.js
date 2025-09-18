@@ -1,5 +1,5 @@
 import express from "express";
-import Vote from "../models/voteModel.js";  // adjust path to your model
+import Vote from "../models/Vote.js";
 import protectRoute from '../middleware/auth.middleware.js';
 
 const router = express.Router();

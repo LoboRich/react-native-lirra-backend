@@ -4,6 +4,7 @@ import "dotenv/config";
 import job from "./lib/cron.js";
 import authRoutes from "./routes/authRoutes.js";
 import readingMaterialsRoutes from "./routes/readingMaterialsRoutes.js";
+import voteRoutes from "./routes/voteRoutes.js";
 import { connectDB } from "./lib/db.js";
 
 const app = express();
@@ -16,7 +17,7 @@ app.use(express.json());
 
 app.use("/api/auth", authRoutes);
 app.use("/api/reading-materials", readingMaterialsRoutes);
-
+app.use("/api/votes", voteRoutes);
 
 app.listen(PORT, () => {
     console.log('Server is running on port', PORT);
