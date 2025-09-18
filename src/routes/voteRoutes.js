@@ -9,18 +9,24 @@ router.post("/:materialId", protectRoute, async (req, res) => {
     const { materialId } = req.params;
     const userId = req.user._id;
 
-    // upsert vote (ensures only one vote per user per material)
-    await Vote.findOneAndUpdate(
-      { user: userId, material: materialId },
-      {},
-      { upsert: true, new: true }
-    );
+    // check if vote already exists
+    const existingVote = await Vote.findOne({ user: userId, material: materialId });
 
-    res.json({ message: "Vote recorded successfully" });
+    if (existingVote) {
+      // remove vote (toggle off)
+      await Vote.deleteOne({ _id: existingVote._id });
+      return res.json({ message: "Vote removed", voted: false });
+    } else {
+      // add new vote (toggle on)
+      await Vote.create({ user: userId, material: materialId });
+      return res.json({ message: "Vote added", voted: true });
+    }
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    console.error("Vote error:", err);
+    res.status(500).json({ message: "Failed to record vote" });
   }
 });
+
 
 router.delete("/:materialId", protectRoute, async (req, res) => {
   try {
