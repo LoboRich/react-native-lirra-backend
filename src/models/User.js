@@ -20,6 +20,27 @@ const userSchema = new mongoose.Schema({
     profileImage: {
         type: String,
         default: null,
+    },
+    role: {
+        type: String,
+        enum: ['user', 'admin'],
+        default: 'user',
+    },
+    firstName: {
+        type: String,
+        default: null,
+    },
+    lastName: {
+        type: String,
+        default: null,
+    },
+    postnomials: {
+        type: String,
+        default: null,
+    },
+    college: {
+        type: String,
+        default: null,
     }
 }, {
     timestamps: true,
