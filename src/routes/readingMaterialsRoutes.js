@@ -2,6 +2,7 @@ import express from 'express';
 import cloudinary from '../lib/cloudinary.js';
 import ReadingMaterial from '../models/ReadingMaterial.js';
 import protectRoute from '../middleware/auth.middleware.js';
+import Vote from '../models/Vote.js';
 
 const router = express.Router();
 
