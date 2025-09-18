@@ -36,37 +36,54 @@ router.post('/', protectRoute, async(req, res) => {
 
 router.get("/", protectRoute, async (req, res) => {
     try {
-        const page = parseInt(req.query.page) || 1;
-        const limit = parseInt(req.query.limit) || 5;
-        const skip = (page - 1) * limit;
-        const search = req.query.search || "";
+      // pagination + search params
+      const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+      const limit = Math.max(1, parseInt(req.query.limit, 10) || 5);
+      const skip = (page - 1) * limit;
+      const search = req.query.search?.trim() || "";
   
-        const searchCondition = search
-            ? { title: { $regex: search, $options: "i" } }
-            : {};
+      // build search condition
+      const searchCondition = search
+        ? { title: { $regex: search, $options: "i" } }
+        : {};
   
-        const readingMaterials = await ReadingMaterial.find(searchCondition)
-            .sort({ createdAt: -1 })
-            .skip(skip)
-            .limit(limit)
-            .populate("user", "username profileImage");
-
-        const totalReadingMaterials = await ReadingMaterial.countDocuments(
-            searchCondition
-        );
+      // query docs + total count in parallel
+      const [materials, totalReadingMaterials] = await Promise.all([
+        ReadingMaterial.find(searchCondition)
+          .sort({ createdAt: -1 })
+          .skip(skip)
+          .limit(limit)
+          .populate("user", "username profileImage"),
+        ReadingMaterial.countDocuments(searchCondition),
+      ]);
   
-        res.send({
-            readingMaterials,
-            currentPage: page,
-            totalReadingMaterials,
-            totalPages: Math.ceil(totalReadingMaterials / limit),
-        });
+      // attach votes info for each material
+      const results = await Promise.all(
+        materials.map(async (material) => {
+          const [votesCount, hasVoted] = await Promise.all([
+            Vote.countDocuments({ material: material._id }),
+            Vote.exists({ material: material._id, user: req.user._id }),
+          ]);
+  
+          return {
+            ...material.toObject(),
+            votesCount,
+            hasVoted: !!hasVoted,
+          };
+        })
+      );
+  
+      res.json({
+        readingMaterials: results,
+        currentPage: page,
+        totalReadingMaterials,
+        totalPages: Math.ceil(totalReadingMaterials / limit),
+      });
     } catch (error) {
-        console.log("Error getting reading materials", error);
-        res.status(500).json({ message: error.message });
+      console.error("Error getting reading materials:", error);
+      res.status(500).json({ message: "Failed to fetch reading materials" });
     }
-});
-  
+});   
 
 router.get('/user', protectRoute, async(req, res) => {
     try {
