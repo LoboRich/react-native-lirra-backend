@@ -24,9 +24,10 @@ router.post("/:materialId", protectRoute, async (req, res) => {
       });
     } else {
       // add new vote (toggle on)
-      await Vote.create({ user: userId, material: materialId });
-      const votesCount = await Vote.countDocuments({ material: materialId });
+      const newVote = await Vote.create({ user: userId, material: materialId });
+      await newVote.save();
 
+      const votesCount = await Vote.countDocuments({ material: materialId });
       return res.json({
         message: "Vote added",
         voted: true,
