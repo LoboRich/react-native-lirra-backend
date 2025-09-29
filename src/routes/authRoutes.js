@@ -2,7 +2,7 @@ import express from 'express';
 import User from '../models/User.js';
 import jwt from 'jsonwebtoken';
 import "dotenv/config";
-
+import ReadingMaterial from '../models/ReadingMaterial.js';
 const router = express.Router();
 
 const generateToken = (userId) => {
@@ -120,4 +120,29 @@ router.post('/login', async(req, res) => {
    }
 })
 
+router.get("/:type", async (req, res) => {
+    try {
+      const { type } = req.params;
+      let result;
+  
+      if (type === "contributors") {
+        // Unique users who have at least one reading material
+        const userIds = await ReadingMaterial.distinct("user");
+        result = await User.find({ _id: { $in: userIds } }).select("-password");
+      } 
+      else if (type === "allActive") {
+        result = await User.find({ isActive: true }).select("-password");
+      } 
+      else if (type === "pending") {
+        result = await User.find({ isActive: false }).select("-password");
+      } 
+      else {
+        return res.status(400).json({ message: "Invalid type parameter" });
+      }
+      return res.status(200).json(result);
+    } catch (error) {
+      console.error("Error on /api/users/:type route", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
 export default router;
