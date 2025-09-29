@@ -41,6 +41,10 @@ const userSchema = new mongoose.Schema({
     college: {
         type: String,
         default: null,
+    },
+    isActive: {
+        type: Boolean,
+        default: false,
     }
 }, {
     timestamps: true,
