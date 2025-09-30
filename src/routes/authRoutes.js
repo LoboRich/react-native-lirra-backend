@@ -80,7 +80,7 @@ router.post('/register', async(req, res) => {
 router.post('/login', async(req, res) => {
    try {
         const { email, password } = req.body;
-
+        
         if(!email || !password) {
             return res.status(400).json({ message: 'All fields are required' });
         }
@@ -89,6 +89,10 @@ router.post('/login', async(req, res) => {
 
         if(!user) {
             return res.status(400).json({ message: 'Invalid credentials' });
+        }
+
+        if(!user.isActive) {
+            return res.status(400).json({ message: 'Your account is pending approval' });
         }
 
         const isPasswordCorrect = await user.comparePassword(password); // check if password is correct
