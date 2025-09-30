@@ -54,22 +54,7 @@ router.post('/register', async(req, res) => {
 
         await user.save();
 
-        const token = generateToken(user._id);
-
-        return res.status(201).json({
-            token,
-            user: {
-                id: user._id,
-                username: user.username,
-                email: user.email,
-                profileImage: user.profileImage,
-                firstName: user.firstName,
-                lastName: user.lastName,
-                postnomials: user.postnomials,
-                college: user.college,
-                role: user.role
-            },
-        });
+        return res.status(200).json({ message: 'User registered successfully. Please wait for admin approval' });
         
    } catch (error) {
         console.log("Error on the register route", error);
