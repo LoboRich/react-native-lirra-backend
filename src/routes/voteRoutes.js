@@ -53,7 +53,7 @@ router.delete("/:materialId", protectRoute, async (req, res) => {
   }
 });
 
-router.get("/:materialId", async (req, res) => {
+router.get("/:materialId", protectRoute, async (req, res) => {
   try {
     const { materialId } = req.params;
 

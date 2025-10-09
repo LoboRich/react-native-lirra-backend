@@ -125,4 +125,61 @@ router.delete('/:id', protectRoute, async(req, res) => {
     }
 })
 
+// Approve a reading material
+router.patch("/:id/approve", protectRoute, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const material = await ReadingMaterial.findByIdAndUpdate(
+      id,
+      { is_approved: true },
+      { new: true }
+    );
+
+    if (!material) {
+      return res.status(404).json({ message: "Reading material not found" });
+    }
+
+    res.json({ message: "Reading material approved successfully", material });
+  } catch (err) {
+    console.error("Error approving reading material:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+router.get("/approved", protectRoute, async (req, res) => {
+  try {
+    const approvedMaterials = await ReadingMaterial.find({ is_approved: true })
+      .populate("user", "name email")
+      .sort({ createdAt: -1 });
+
+    res.json({ readingMaterials: approvedMaterials });
+  } catch (err) {
+    console.error("Error fetching approved reading materials:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+// Get all reading materials a user has voted for
+router.get("/voted/:userId", protectRoute, async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    // Find all votes by the user
+    const votes = await Vote.find({ user: userId }).populate({
+      path: "material",
+      populate: { path: "user", select: "name email" }, //uploader info
+    });
+
+    // Extract the reading materials from the votes
+    const votedMaterials = votes
+      .map((vote) => vote.material)
+      .filter((m) => m != null); // filter out nulls if any deleted
+
+    res.json({ readingMaterials: votedMaterials });
+  } catch (err) {
+    console.error("Error fetching voted materials:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
 export default router;
