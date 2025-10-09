@@ -86,15 +86,36 @@ router.get("/", protectRoute, async (req, res) => {
     }
 });   
 
-router.get('/user', protectRoute, async(req, res) => {
-    try {
-        const readingMaterials = await ReadingMaterial.find({user: req.user._id}).sort({createdAt: -1});
-        res.json(readingMaterials);
-    } catch (error) {
-        console.log("Error getting user reading materials", error);
-        res.status(500).json({message: error.message});
+router.get("/user/materials", protectRoute, async (req, res) => {
+  try {
+    const { filter } = req.query; // "recommended" or "voted"
+    const userId = req.user._id;
+
+    let readingMaterials = [];
+
+    if (filter === "voted") {
+      // Materials the user voted on
+      const votes = await Vote.find({ user: userId }).populate({
+        path: "material",
+        populate: { path: "user", select: "name email" }, // include uploader info
+      });
+
+      readingMaterials = votes
+        .map((vote) => vote.material)
+        .filter((m) => m != null);
+    } else {
+      // User’s own uploaded materials
+      readingMaterials = await ReadingMaterial.find({ user: userId })
+        .sort({ createdAt: -1 })
+        .populate("user", "name email");
     }
-})
+
+    res.json({ readingMaterials });
+  } catch (error) {
+    console.error("Error fetching user materials:", error);
+    res.status(500).json({ message: error.message });
+  }
+});
 
 router.delete('/:id', protectRoute, async(req, res) => {
     try {
@@ -160,26 +181,4 @@ router.get("/approved", protectRoute, async (req, res) => {
   }
 });
 
-// Get all reading materials a user has voted for
-router.get("/voted/:userId", protectRoute, async (req, res) => {
-  try {
-    const { userId } = req.params;
-
-    // Find all votes by the user
-    const votes = await Vote.find({ user: userId }).populate({
-      path: "material",
-      populate: { path: "user", select: "name email" }, //uploader info
-    });
-
-    // Extract the reading materials from the votes
-    const votedMaterials = votes
-      .map((vote) => vote.material)
-      .filter((m) => m != null); // filter out nulls if any deleted
-
-    res.json({ readingMaterials: votedMaterials });
-  } catch (err) {
-    console.error("Error fetching voted materials:", err);
-    res.status(500).json({ message: "Server error" });
-  }
-});
 export default router;
