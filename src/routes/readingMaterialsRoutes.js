@@ -36,55 +36,66 @@ router.post('/', protectRoute, async(req, res) => {
 })
 
 router.get("/", protectRoute, async (req, res) => {
-    try {
-      // pagination + search params
-      const page = Math.max(1, parseInt(req.query.page, 10) || 1);
-      const limit = Math.max(1, parseInt(req.query.limit, 10) || 5);
-      const skip = (page - 1) * limit;
-      const search = req.query.search?.trim() || "";
-  
-      // build search condition
-      const searchCondition = search
-        ? { title: { $regex: search, $options: "i" } }
-        : {};
-  
-      // query docs + total count in parallel
-      const [materials, totalReadingMaterials] = await Promise.all([
-        ReadingMaterial.find(searchCondition)
-          .sort({ createdAt: -1 })
-          .skip(skip)
-          .limit(limit)
-          .populate("user", "username profileImage"),
-        ReadingMaterial.countDocuments(searchCondition),
-      ]);
-  
-      // attach votes info for each material
-      const results = await Promise.all(
-        materials.map(async (material) => {
-          const [votesCount, hasVoted] = await Promise.all([
-            Vote.countDocuments({ material: material._id }),
-            Vote.exists({ material: material._id, user: req.user._id }),
-          ]);
-  
-          return {
-            ...material.toObject(),
-            votesCount,
-            hasVoted: !!hasVoted,
-          };
-        })
-      );
-  
-      res.json({
-        readingMaterials: results,
-        currentPage: page,
-        totalReadingMaterials,
-        totalPages: Math.ceil(totalReadingMaterials / limit),
-      });
-    } catch (error) {
-      console.error("Error getting reading materials:", error);
-      res.status(500).json({ message: "Failed to fetch reading materials" });
+  try {
+    // pagination + search params
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limit = Math.max(1, parseInt(req.query.limit, 10) || 5);
+    const skip = (page - 1) * limit;
+    const search = req.query.search?.trim() || "";
+    const approvedFilter = req.query.approved; // e.g. ?approved=true
+
+    // Build filter condition
+    const searchCondition = {};
+
+    // Search by title
+    if (search) {
+      searchCondition.title = { $regex: search, $options: "i" };
     }
-});   
+
+    // Handle approved filter (optional)
+    if (approvedFilter === "true") {
+      searchCondition.is_approved = true;
+    } else if (approvedFilter === "false") {
+      searchCondition.is_approved = false;
+    }
+
+    // query materials and total count
+    const [materials, totalReadingMaterials] = await Promise.all([
+      ReadingMaterial.find(searchCondition)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .populate("user", "username profileImage"),
+      ReadingMaterial.countDocuments(searchCondition),
+    ]);
+
+    // attach votes info for each material
+    const results = await Promise.all(
+      materials.map(async (material) => {
+        const [votesCount, hasVoted] = await Promise.all([
+          Vote.countDocuments({ material: material._id }),
+          Vote.exists({ material: material._id, user: req.user._id }),
+        ]);
+
+        return {
+          ...material.toObject(),
+          votesCount,
+          hasVoted: !!hasVoted,
+        };
+      })
+    );
+
+    res.json({
+      readingMaterials: results,
+      currentPage: page,
+      totalReadingMaterials,
+      totalPages: Math.ceil(totalReadingMaterials / limit),
+    });
+  } catch (error) {
+    console.error("Error getting reading materials:", error);
+    res.status(500).json({ message: "Failed to fetch reading materials" });
+  }
+}); 
 
 router.get("/user/materials", protectRoute, async (req, res) => {
   try {
