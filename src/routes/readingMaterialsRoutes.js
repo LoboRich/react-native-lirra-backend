@@ -8,21 +8,20 @@ const router = express.Router();
 
 router.post('/', protectRoute, async(req, res) => {
     try {
-        const {title, type, caption, author, image} = req.body;
+        const {title, type, caption, author} = req.body;
 
-        if(!title || !caption || !image) {
+        if(!title || !caption || !author) {
             return res.status(400).json({message: 'Please provide all required fields'});
         }
         // upload image to cloudinary
-        const uploadResponse = await cloudinary.uploader.upload(image)
-        const imageUrl = uploadResponse.secure_url;
+        // const uploadResponse = await cloudinary.uploader.upload(image)
+        // const imageUrl = uploadResponse.secure_url;
 
         const newReadingMaterial = await ReadingMaterial.create({
             title,
             type,
             caption,
             author,
-            image: imageUrl,
             user: req.user._id
         });
 
