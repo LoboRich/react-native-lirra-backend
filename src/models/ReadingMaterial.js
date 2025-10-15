@@ -24,7 +24,12 @@ const readingMaterialSchema = new mongoose.Schema({
     },
     image: {
         type: String,
+        required: false
+    },
+    college: {
+        type: String,
         required: true,
+        default: 'College of Industrial Technology',
     },
     user: {
         type: mongoose.Schema.Types.ObjectId,
