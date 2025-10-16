@@ -31,11 +31,24 @@ const readingMaterialSchema = new mongoose.Schema({
         required: true,
         default: 'College of Industrial Technology',
     },
+    keywords: {
+        type: [String],
+        default: [],
+        index: true
+    },
+    version: {
+        type: Number,
+        required: false
+    },
+    edition: {
+        type: Number,
+        required: false
+    },
     user: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
         required: true,
-    }   
+    }
 }, {
     timestamps: true,
 });
