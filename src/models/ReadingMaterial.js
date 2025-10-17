@@ -11,7 +11,7 @@ const readingMaterialSchema = new mongoose.Schema({
     },
     caption: {
         type: String,
-        required: true,
+        required: false,
     },
     author: {
         type: String,
