@@ -8,7 +8,7 @@ const router = express.Router();
 
 router.post('/', protectRoute, async(req, res) => {
     try {
-        const {title, type, caption, author, keywords, version, edition} = req.body;
+        const {title, type, caption, author, keywords, version, edition, subjectTitles} = req.body;
 
         if(!title || !caption || !author) {
             return res.status(400).json({message: 'Please provide all required fields'});
@@ -25,6 +25,7 @@ router.post('/', protectRoute, async(req, res) => {
             keywords,
             version,
             edition,
+            subjectTitles,
             user: req.user._id
         });
 

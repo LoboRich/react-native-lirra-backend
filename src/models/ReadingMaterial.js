@@ -36,6 +36,11 @@ const readingMaterialSchema = new mongoose.Schema({
         default: [],
         index: true
     },
+    subjectTitles: {
+        type: [String],
+        default: [],
+        index: true
+    },
     version: {
         type: Number,
         required: false
