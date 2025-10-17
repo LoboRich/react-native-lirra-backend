@@ -220,4 +220,25 @@ router.put("/:id/subject-titles", protectRoute, async (req, res) => {
   }
 });
 
+// GET /api/reading-materials/keywords
+router.get("/keywords", async (req, res) => {
+  try {
+    const materials = await ReadingMaterial.find({}, "keywords");
+    const freq = {};
+
+    materials.forEach((m) => {
+      m.keywords.forEach((k) => {
+        freq[k] = (freq[k] || 0) + 1;
+      });
+    });
+
+    const result = Object.entries(freq).map(([word, count]) => ({ word, count }));
+    res.json(result);
+  } catch (err) {
+    console.error("Error fetching keywords:", err);
+    res.status(500).json({ message: "Failed to fetch keywords" });
+  }
+});
+
+
 export default router;
