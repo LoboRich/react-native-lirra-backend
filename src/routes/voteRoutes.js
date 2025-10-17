@@ -9,28 +9,32 @@ router.post("/:materialId", protectRoute, async (req, res) => {
     const { materialId } = req.params;
     const userId = req.user._id;
 
-    // check if vote already exists
+    // Check if user already voted
     const existingVote = await Vote.findOne({ user: userId, material: materialId });
 
+    // Count votes for display
+    const votesCount = await Vote.countDocuments({ material: materialId });
+
     if (existingVote) {
-      // remove vote (toggle off)
+      // User already voted → do nothing
       return res.json({
         message: "Already voted",
         voted: true,
         votesCount,
       });
-    } else {
-      // add new vote (toggle on)
-      const newVote = await Vote.create({ user: userId, material: materialId });
-      await newVote.save();
-
-      const votesCount = await Vote.countDocuments({ material: materialId });
-      return res.json({
-        message: "Vote added",
-        voted: true,
-        votesCount,
-      });
     }
+
+    // Add new vote
+    await Vote.create({ user: userId, material: materialId });
+
+    // Recount votes after adding
+    const updatedVotesCount = await Vote.countDocuments({ material: materialId });
+
+    return res.json({
+      message: "Vote added",
+      voted: true,
+      votesCount: updatedVotesCount,
+    });
   } catch (err) {
     console.error("Vote error:", err);
     res.status(500).json({ message: "Failed to record vote" });
