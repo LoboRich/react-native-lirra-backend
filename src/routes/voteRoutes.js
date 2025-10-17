@@ -14,12 +14,9 @@ router.post("/:materialId", protectRoute, async (req, res) => {
 
     if (existingVote) {
       // remove vote (toggle off)
-      await Vote.deleteOne({ _id: existingVote._id });
-      const votesCount = await Vote.countDocuments({ material: materialId });
-
       return res.json({
-        message: "Vote removed",
-        voted: false,
+        message: "Already voted",
+        voted: true,
         votesCount,
       });
     } else {
