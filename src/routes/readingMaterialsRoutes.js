@@ -195,4 +195,29 @@ router.get("/approved", protectRoute, async (req, res) => {
   }
 });
 
+router.put("/:id/subject-titles", protectRoute, async (req, res) => {
+  try {
+    const { subjectTitles } = req.body;
+
+    if (!Array.isArray(subjectTitles)) {
+      return res.status(400).json({ message: "subjectTitles must be an array" });
+    }
+
+    const material = await ReadingMaterial.findByIdAndUpdate(
+      req.params.id,
+      { subjectTitles },
+      { new: true }
+    );
+
+    if (!material) {
+      return res.status(404).json({ message: "Reading material not found" });
+    }
+
+    res.json({ message: "Subject titles updated successfully", material });
+  } catch (error) {
+    console.error("Error updating subject titles:", error);
+    res.status(500).json({ message: "Failed to update subject titles" });
+  }
+});
+
 export default router;
