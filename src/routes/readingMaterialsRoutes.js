@@ -38,58 +38,138 @@ router.post('/', protectRoute, async(req, res) => {
     }
 })
 
+// router.get("/", protectRoute, async (req, res) => {
+//   try {
+//     // pagination + search params
+//     const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+//     const limit = Math.max(1, parseInt(req.query.limit, 10) || 5);
+//     const skip = (page - 1) * limit;
+//     const search = req.query.search?.trim() || "";
+//     const approvedFilter = req.query.approved; // e.g. ?approved=true
+
+//     // Build filter condition
+//     const searchCondition = {};
+
+//     // Search by title
+//     if (search) {
+//       searchCondition.title = { $regex: search, $options: "i" };
+//     }
+
+//     // Handle approved filter (optional)
+//     if (approvedFilter === "true") {
+//       searchCondition.is_approved = true;
+//     } else if (approvedFilter === "false") {
+//       searchCondition.is_approved = false;
+//     }
+
+//     // query materials and total count
+//     const [materials, totalReadingMaterials] = await Promise.all([
+//       ReadingMaterial.find(searchCondition)
+//         .sort({ createdAt: -1 })
+//         .skip(skip)
+//         .limit(limit)
+//         .populate("user", "username profileImage"),
+//       ReadingMaterial.countDocuments(searchCondition),
+//     ]);
+
+//     // attach votes info for each material
+//     const results = await Promise.all(
+//       materials.map(async (material) => {
+//         const [votesCount, hasVoted] = await Promise.all([
+//           Vote.countDocuments({ material: material._id }),
+//           Vote.exists({ material: material._id, user: req.user._id }),
+//         ]);
+
+//         return {
+//           ...material.toObject(),
+//           votesCount,
+//           hasVoted: !!hasVoted,
+//         };
+//       })
+//     );
+
+//     res.json({
+//       readingMaterials: results,
+//       currentPage: page,
+//       totalReadingMaterials,
+//       totalPages: Math.ceil(totalReadingMaterials / limit),
+//     });
+//   } catch (error) {
+//     console.error("Error getting reading materials:", error);
+//     res.status(500).json({ message: "Failed to fetch reading materials" });
+//   }
+// }); 
+
 router.get("/", protectRoute, async (req, res) => {
   try {
-    // pagination + search params
+    // Pagination + filters
     const page = Math.max(1, parseInt(req.query.page, 10) || 1);
     const limit = Math.max(1, parseInt(req.query.limit, 10) || 5);
     const skip = (page - 1) * limit;
+
     const search = req.query.search?.trim() || "";
-    const approvedFilter = req.query.approved; // e.g. ?approved=true
+    const approvedFilter = req.query.approved;
+    const sortParam = req.query.sort || "newest"; // newest | popular
+    const keywordFilter = req.query.keyword?.trim() || "";
 
     // Build filter condition
-    const searchCondition = {};
+    const filter = {};
 
-    // Search by title
     if (search) {
-      searchCondition.title = { $regex: search, $options: "i" };
+      filter.title = { $regex: search, $options: "i" };
     }
 
-    // Handle approved filter (optional)
     if (approvedFilter === "true") {
-      searchCondition.is_approved = true;
+      filter.is_approved = true;
     } else if (approvedFilter === "false") {
-      searchCondition.is_approved = false;
+      filter.is_approved = false;
     }
 
-    // query materials and total count
-    const [materials, totalReadingMaterials] = await Promise.all([
-      ReadingMaterial.find(searchCondition)
-        .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(limit)
-        .populate("user", "username profileImage"),
-      ReadingMaterial.countDocuments(searchCondition),
-    ]);
+    if (keywordFilter) {
+      // assuming material.keywords is an array of strings
+      filter.keywords = { $regex: keywordFilter, $options: "i" };
+    }
 
-    // attach votes info for each material
-    const results = await Promise.all(
+    // Get all materials first (will handle popularity sorting later)
+    const materials = await ReadingMaterial.find(filter)
+      .populate("user", "username profileImage")
+      .skip(skip)
+      .limit(limit)
+      .lean();
+
+    // Attach votes info for each material
+    const enriched = await Promise.all(
       materials.map(async (material) => {
-        const [votesCount, hasVoted] = await Promise.all([
-          Vote.countDocuments({ material: material._id }),
-          Vote.exists({ material: material._id, user: req.user._id }),
-        ]);
+        const votesCount = await Vote.countDocuments({ material: material._id });
+        const hasVoted = await Vote.exists({
+          material: material._id,
+          user: req.user._id,
+        });
 
         return {
-          ...material.toObject(),
+          ...material,
           votesCount,
           hasVoted: !!hasVoted,
         };
       })
     );
 
+    // Apply sorting
+    let sortedResults = enriched;
+    if (sortParam === "popular") {
+      sortedResults = enriched.sort((a, b) => b.votesCount - a.votesCount);
+      console.log("Sorted by popularity", enriched.map(r => ({title: r.title, votes: r.votesCount})));
+    } else if (sortParam === "newest") {
+      sortedResults = enriched.sort(
+        (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
+      );
+    }
+
+    // Get total count (for pagination)
+    const totalReadingMaterials = await ReadingMaterial.countDocuments(filter);
+
     res.json({
-      readingMaterials: results,
+      readingMaterials: sortedResults,
       currentPage: page,
       totalReadingMaterials,
       totalPages: Math.ceil(totalReadingMaterials / limit),
@@ -98,7 +178,7 @@ router.get("/", protectRoute, async (req, res) => {
     console.error("Error getting reading materials:", error);
     res.status(500).json({ message: "Failed to fetch reading materials" });
   }
-}); 
+});
 
 router.get("/user/materials", protectRoute, async (req, res) => {
   try {
