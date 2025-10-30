@@ -38,144 +38,127 @@ router.post('/', protectRoute, async(req, res) => {
     }
 })
 
-// router.get("/", protectRoute, async (req, res) => {
-//   try {
-//     // pagination + search params
-//     const page = Math.max(1, parseInt(req.query.page, 10) || 1);
-//     const limit = Math.max(1, parseInt(req.query.limit, 10) || 5);
-//     const skip = (page - 1) * limit;
-//     const search = req.query.search?.trim() || "";
-//     const approvedFilter = req.query.approved; // e.g. ?approved=true
-
-//     // Build filter condition
-//     const searchCondition = {};
-
-//     // Search by title
-//     if (search) {
-//       searchCondition.title = { $regex: search, $options: "i" };
-//     }
-
-//     // Handle approved filter (optional)
-//     if (approvedFilter === "true") {
-//       searchCondition.is_approved = true;
-//     } else if (approvedFilter === "false") {
-//       searchCondition.is_approved = false;
-//     }
-
-//     // query materials and total count
-//     const [materials, totalReadingMaterials] = await Promise.all([
-//       ReadingMaterial.find(searchCondition)
-//         .sort({ createdAt: -1 })
-//         .skip(skip)
-//         .limit(limit)
-//         .populate("user", "username profileImage"),
-//       ReadingMaterial.countDocuments(searchCondition),
-//     ]);
-
-//     // attach votes info for each material
-//     const results = await Promise.all(
-//       materials.map(async (material) => {
-//         const [votesCount, hasVoted] = await Promise.all([
-//           Vote.countDocuments({ material: material._id }),
-//           Vote.exists({ material: material._id, user: req.user._id }),
-//         ]);
-
-//         return {
-//           ...material.toObject(),
-//           votesCount,
-//           hasVoted: !!hasVoted,
-//         };
-//       })
-//     );
-
-//     res.json({
-//       readingMaterials: results,
-//       currentPage: page,
-//       totalReadingMaterials,
-//       totalPages: Math.ceil(totalReadingMaterials / limit),
-//     });
-//   } catch (error) {
-//     console.error("Error getting reading materials:", error);
-//     res.status(500).json({ message: "Failed to fetch reading materials" });
-//   }
-// }); 
-
+// GET /reading-materials
 router.get("/", protectRoute, async (req, res) => {
   try {
-    // Pagination + filters
     const page = Math.max(1, parseInt(req.query.page, 10) || 1);
-    const limit = Math.max(1, parseInt(req.query.limit, 10) || 5);
+    const limit = Math.max(1, parseInt(req.query.limit, 10) || 10);
     const skip = (page - 1) * limit;
 
     const search = req.query.search?.trim() || "";
-    const approvedFilter = req.query.approved;
-    const sortParam = req.query.sort || "newest"; // newest | popular
+    const sortParam = req.query.sort || "newest"; // "newest" | "popular"
     const keywordFilter = req.query.keyword?.trim() || "";
 
-    // Build filter condition
-    const filter = {};
+    // Build base match filter
+    const match = {};
+    if (search) match.title = { $regex: search, $options: "i" };
+    if (keywordFilter) match.keywords = { $regex: keywordFilter, $options: "i" };
 
-    if (search) {
-      filter.title = { $regex: search, $options: "i" };
-    }
+    // ---- AGGREGATION PIPELINE ----
+    const pipeline = [
+      { $match: match },
 
-    if (approvedFilter === "true") {
-      filter.is_approved = true;
-    } else if (approvedFilter === "false") {
-      filter.is_approved = false;
-    }
+      // Lookup user info
+      {
+        $lookup: {
+          from: "users",
+          localField: "user",
+          foreignField: "_id",
+          as: "userDoc",
+        },
+      },
+      { $unwind: { path: "$userDoc", preserveNullAndEmptyArrays: true } },
 
-    if (keywordFilter) {
-      // assuming material.keywords is an array of strings
-      filter.keywords = { $regex: keywordFilter, $options: "i" };
-    }
+      // Lookup votes and count them efficiently
+      {
+        $lookup: {
+          from: "votes",
+          let: { materialId: "$_id" },
+          pipeline: [
+            { $match: { $expr: { $eq: ["$material", "$$materialId"] } } },
+            { $count: "count" },
+          ],
+          as: "votesAgg",
+        },
+      },
 
-    // Get all materials first (will handle popularity sorting later)
-    const materials = await ReadingMaterial.find(filter)
-      .populate("user", "username profileImage")
-      .skip(skip)
-      .limit(limit)
-      .lean();
+      // Add votesCount as a numeric field
+      {
+        $addFields: {
+          votesCount: {
+            $cond: [
+              { $gt: [{ $size: "$votesAgg" }, 0] },
+              { $arrayElemAt: ["$votesAgg.count", 0] },
+              0,
+            ],
+          },
+        },
+      },
+    ];
 
-    // Attach votes info for each material
-    const enriched = await Promise.all(
-      materials.map(async (material) => {
-        const votesCount = await Vote.countDocuments({ material: material._id });
-        const hasVoted = await Vote.exists({
-          material: material._id,
-          user: req.user._id,
-        });
-
-        return {
-          ...material,
-          votesCount,
-          hasVoted: !!hasVoted,
-        };
-      })
-    );
-
-    // Apply sorting
-    let sortedResults = enriched;
+    // ---- SORTING LOGIC ----
     if (sortParam === "popular") {
-      sortedResults = enriched.sort((a, b) => b.votesCount - a.votesCount);
-      console.log("Sorted by popularity", enriched.map(r => ({title: r.title, votes: r.votesCount})));
-    } else if (sortParam === "newest") {
-      sortedResults = enriched.sort(
-        (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
-      );
+      // Sort by votesCount (descending), then by createdAt (descending)
+      pipeline.push({ $sort: { votesCount: -1, createdAt: -1 } });
+    } else {
+      // Default to "newest" sorting (by createdAt, descending)
+      pipeline.push({ $sort: { createdAt: -1 } });
     }
 
-    // Get total count (for pagination)
-    const totalReadingMaterials = await ReadingMaterial.countDocuments(filter);
+    // ---- FINAL PROJECTION (clean output) ----
+    pipeline.push({
+      $project: {
+        title: 1,
+        type: 1,
+        caption: 1,
+        author: 1,
+        keywords: 1,
+        createdAt: 1,
+        votesCount: 1,
+        user: {
+          _id: "$userDoc._id",
+          username: "$userDoc.username",
+          profileImage: "$userDoc.profileImage",
+        },
+      },
+    });
 
+    // ---- PAGINATION ----
+    pipeline.push({ $skip: skip }, { $limit: limit });
+
+    // ---- EXECUTE AGGREGATION ----
+    const materials = await ReadingMaterial.aggregate(pipeline);
+
+    // ---- DETERMINE USER'S VOTES ----
+    const materialIds = materials.map((m) => m._id);
+    const userVotedMaterialIds =
+      materialIds.length > 0
+        ? await Vote.find({
+            material: { $in: materialIds },
+            user: req.user._id,
+          }).distinct("material")
+        : [];
+
+    // Map hasVoted flag
+    const results = materials.map((m) => ({
+      ...m,
+      hasVoted: userVotedMaterialIds
+        .map((id) => id.toString())
+        .includes(m._id.toString()),
+    }));
+
+    // ---- TOTAL COUNT (for pagination) ----
+    const totalReadingMaterials = await ReadingMaterial.countDocuments(match);
+
+    // ---- RESPONSE ----
     res.json({
-      readingMaterials: sortedResults,
+      readingMaterials: results,
       currentPage: page,
       totalReadingMaterials,
       totalPages: Math.ceil(totalReadingMaterials / limit),
     });
-  } catch (error) {
-    console.error("Error getting reading materials:", error);
+  } catch (err) {
+    console.error("Error getting reading materials:", err);
     res.status(500).json({ message: "Failed to fetch reading materials" });
   }
 });
