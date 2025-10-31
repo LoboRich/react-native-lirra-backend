@@ -46,7 +46,7 @@ router.get("/", protectRoute, async (req, res) => {
     const skip = (page - 1) * limit;
 
     const search = req.query.search?.trim() || "";
-    const sortParam = req.query.sort || "newest"; // "newest" | "popular"
+    const sortParam = req.query.sort || "newest";
     const keywordFilter = req.query.keyword?.trim() || "";
 
     // Build base match filter
@@ -96,13 +96,15 @@ router.get("/", protectRoute, async (req, res) => {
       },
     ];
 
-    // ---- SORTING LOGIC ----
-    if (sortParam === "popular") {
-      // Sort by votesCount (descending), then by createdAt (descending)
-      pipeline.push({ $sort: { votesCount: -1, createdAt: -1 } });
-    } else {
-      // Default to "newest" sorting (by createdAt, descending)
-      pipeline.push({ $sort: { createdAt: -1 } });
+    if (keywordFilter === "") {
+      // ---- SORTING LOGIC ----
+      if (sortParam === "popular") {
+        // Sort by votesCount (descending), then by createdAt (descending)
+        pipeline.push({ $sort: { votesCount: -1, createdAt: -1 } });
+      } else {
+        // Default to "newest" sorting (by createdAt, descending)
+        pipeline.push({ $sort: { createdAt: -1 } });
+      }
     }
 
     // ---- FINAL PROJECTION (clean output) ----
