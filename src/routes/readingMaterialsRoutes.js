@@ -96,7 +96,7 @@ router.get("/", protectRoute, async (req, res) => {
       },
     ];
 
-    if (keywordFilter === "") {
+    if (sortParam !== "keywords") {
       // ---- SORTING LOGIC ----
       if (sortParam === "popular") {
         // Sort by votesCount (descending), then by createdAt (descending)
@@ -171,7 +171,7 @@ router.get("/user/materials", protectRoute, async (req, res) => {
     const userId = req.user._id;
 
     let readingMaterials = [];
-
+    
     if (filter === "voted") {
       // Materials the user voted on
       const votes = await Vote.find({ user: userId }).populate({
