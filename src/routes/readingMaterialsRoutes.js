@@ -305,5 +305,80 @@ router.get("/keywords", async (req, res) => {
   }
 });
 
+// GET /reading-materials/top
+router.get("/top", protectRoute, async (req, res) => {
+  try {
+    const pipeline = [
+      // Lookup votes and count them
+      {
+        $lookup: {
+          from: "votes",
+          let: { materialId: "$_id" },
+          pipeline: [
+            { $match: { $expr: { $eq: ["$material", "$$materialId"] } } },
+            { $count: "count" },
+          ],
+          as: "votesAgg",
+        },
+      },
+
+      // Add votesCount
+      {
+        $addFields: {
+          votesCount: {
+            $cond: [
+              { $gt: [{ $size: "$votesAgg" }, 0] },
+              { $arrayElemAt: ["$votesAgg.count", 0] },
+              0,
+            ],
+          },
+        },
+      },
+
+      // Sort by votesCount DESC
+      { $sort: { votesCount: -1, createdAt: -1 } },
+
+      // Limit to the top 5
+      { $limit: 5 },
+
+      // Optional lookup for user info
+      {
+        $lookup: {
+          from: "users",
+          localField: "user",
+          foreignField: "_id",
+          as: "userDoc",
+        },
+      },
+      { $unwind: { path: "$userDoc", preserveNullAndEmptyArrays: true } },
+
+      // Final projection
+      {
+        $project: {
+          title: 1,
+          type: 1,
+          caption: 1,
+          author: 1,
+          keywords: 1,
+          votesCount: 1,
+          createdAt: 1,
+          user: {
+            _id: "$userDoc._id",
+            username: "$userDoc.username",
+            profileImage: "$userDoc.profileImage",
+          },
+        },
+      },
+    ];
+
+    const topMaterials = await ReadingMaterial.aggregate(pipeline);
+
+    res.json({ topMaterials });
+  } catch (err) {
+    console.error("Error getting top reading materials:", err);
+    res.status(500).json({ message: "Failed to fetch top reading materials" });
+  }
+});
+
 
 export default router;
